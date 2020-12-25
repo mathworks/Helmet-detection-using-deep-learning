@@ -1,0 +1,61 @@
+%% YOLO v2 物体検出器の学習
+% 学習データのラベリングから物探検出器の学習までを実行
+%% 初期化
+clear; close all; clc; rng('default');
+load gTruth
+%% 学習済みのYOLO v2による物体検出
+load('trainedYOLOv2Detector');
+
+%% 学習済みのYOLO v2による物体検出
+% 動画に対して連続実行
+videoFReader = vision.VideoFileReader(gTruth.DataSource.Source);
+videoPlayer = vision.DeployableVideoPlayer;
+doRecording = false;
+
+numFrames = 10;
+cntFrames = 1;
+cmaps(1,:)=[0 255 255];
+cmaps(2,:)=[255 0 0];
+labelpre =categorical("Helmet");
+while ~isDone(videoFReader)
+    I = videoFReader();
+    
+    % 検出器を実行
+    [bboxes, scores, labels] = detect(detector, I);
+    [~,ind] = ismember(labels,gTruth.LabelDefinitions.Name);
+    
+    % 結果の可視化
+    if isempty(labels)  
+        detectedImg = I;
+    elseif ~(labelpre == labels(1))
+        detectedImg = I;
+        labelpre = labels(1); 
+    else
+        detectedImg = insertObjectAnnotation(I, 'Rectangle', bboxes(1,:), cellstr(labels(1)),...
+            'Color',im2single(cmaps(ind(1),:)),'FontSize',20,'TextBoxOpacity',1);
+        labelpre = labels(1); 
+    end
+    videoPlayer(detectedImg);
+    cntFrames = cntFrames + 1;
+end
+
+%% サポート関数
+
+function dist = iouDistanceMetric(boxWidthHeight,allBoxWidthHeight)
+% IoUを基に距離としてメトリックを計算
+
+% x, yの追加しバウンディングボックスとしてIoUを計算できるようにする
+boxWidthHeight = prefixXYCoordinates(boxWidthHeight);
+allBoxWidthHeight = prefixXYCoordinates(allBoxWidthHeight);
+
+% IoUを距離相当に変換したメトリック
+dist = 1 - bboxOverlapRatio(allBoxWidthHeight, boxWidthHeight);
+end
+
+function boxWidthHeight = prefixXYCoordinates(boxWidthHeight)
+% X,Y座標を追加してバウンディングボックスの形式に変換
+n = size(boxWidthHeight,1);
+boxWidthHeight = [ones(n,2) boxWidthHeight];
+end
+%% 終了
+% _Copyright 2019 The MathWorks, Inc._
